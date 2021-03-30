@@ -1,0 +1,70 @@
+# Maven
+# Build your Java project and run tests with Apache Maven.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+
+trigger:
+- development
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: MavenAuthenticate@0
+  displayName: Authenticate to Maven InternalUse
+  inputs:
+    artifactsFeeds: 'InternalUse'
+- task: Maven@3
+  displayName: Build microservice
+  inputs:
+    mavenPomFile: 'pom.xml'
+    mavenOptions: '-Xmx3072m'
+    javaHomeOption: 'JDKVersion'
+    jdkVersionOption: '1.8'
+    jdkArchitectureOption: 'x64'
+    publishJUnitResults: true
+    testResultsFiles: '**/surefire-reports/TEST-*.xml'
+    goals: 'clean package'
+
+- task: Maven@3
+  displayName: Analize Sonarqube
+  inputs:
+    mavenPomFile: 'pom.xml'
+    mavenOptions: '-Xmx3072m'
+    javaHomeOption: 'JDKVersion'
+    jdkVersionOption: '1.8'
+    jdkArchitectureOption: 'x64'
+    publishJUnitResults: true
+    testResultsFiles: '**/surefire-reports/TEST-*.xml'
+    goals: 'sonar:sonar -Dsonar.projectKey=$(SONAR_PRY_KEY) -Dsonar.host.url=$(SONAR_PRY_URL) -Dsonar.login=$(SONAR_PRY_LOGIN) -Dsonar.java.binaries=target/classes -Dsonar.coverage.exclusions=**/*.java -Dsonar.proyectName=ms-parameter-sipac'
+    
+- task: PublishPipelineArtifact@1
+  displayName: Publish JAR as artifact
+  inputs:
+    targetPath: '$(Pipeline.Workspace)'
+    artifact: 'package'
+    publishLocation: 'pipeline'
+
+- task: Docker@2
+  displayName: Build and push Docker Image Tag
+  inputs:
+    containerRegistry: '$(DOCKER_SERVICE_ENDPOINT)'
+    repository: $(DOCKER_NAME)
+    Dockerfile: '$(Pipeline.Workspace)/s/Dockerfile'
+    buildContext: '$(Pipeline.Workspace)/s'
+
+- script: |
+   echo ****Replacing environment variables****
+   DOCKER_IMAGE_TAG=$(DOCKER_REGISTRY)/$(DOCKER_NAME):$(Build.BuildId)
+   < deployment.yml sed  ' s|{{DOCKER_IMAGE_TAG}}|'$DOCKER_IMAGE_TAG'|g ' > deployment-prod.yml
+  workingDirectory: '$(Pipeline.Workspace)/s'
+  displayName: 'Setting Environment variables'
+
+- task: Kubernetes@1
+  displayName: 'kubectl - applying changes'
+  inputs:
+    kubernetesServiceEndpoint: '$(k8S_SERVICE_ENDPOINT)'
+    command: apply
+    useConfigurationFile: true
+    configuration: '$(Pipeline.Workspace)/s/deployment-prod.yml'
+    workingDirectory: '$(Pipeline.Workspace)/s'
