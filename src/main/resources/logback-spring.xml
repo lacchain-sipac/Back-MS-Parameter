@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="false">
+
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+	<springProperty scope="context" name="microName" source="spring.application.name" defaultValue="ms-parameter"/>
+	<appender name="STDOUT"
+		class="ch.qos.logback.core.ConsoleAppender">
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			<Pattern>
+				%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} -
+				%msg%n
+			</Pattern>
+		</layout>
+	</appender>
+	
+		<appender name="STDOUT_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>500</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+    	<appender-ref ref="STDOUT" />
+  	</appender>
+	
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <!--<destination>logstash:5000</destination>-->
+        <destination>logstash:4560</destination>
+
+       		<encoder class="net.logstash.logback.encoder.LogstashEncoder">
+			<includeCallerData>false</includeCallerData>
+			<includeContext>false</includeContext>
+			<shortenedLoggerNameLength>36</shortenedLoggerNameLength>
+			<customFields>
+				{
+				"microservice_name": "${microName}",
+				"jvm_system_variable": "${java.runtime.name} ${java.runtime.version}"																								
+				}
+			</customFields>
+		</encoder>
+    </appender>
+
+	<appender name="LOGSTASH_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>500</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+    	<appender-ref ref="LOGSTASH" />
+  	</appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT_ASYNC"/>
+        <appender-ref ref="LOGSTASH_ASYNC"/>
+    </root>
+
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="com.cadena.provider" level="INFO"/>
+</configuration>

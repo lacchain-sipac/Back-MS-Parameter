@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-parameter-deployment
+  namespace: kube-honduras
+  labels:
+    app: ms-parameter-honduras
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-parameter-honduras
+  strategy:
+    type: Recreate      
+  template:
+    metadata:
+      labels:
+        app: ms-parameter-honduras
+    spec:
+      containers:
+      - env:
+        - name: CONEXION_MONGO
+          valueFrom:
+            secretKeyRef:
+              name: secretsipac
+              key: MONGO_CONNECTION 
+        - name: PORT_SERVER
+          value: "8083"
+        - name: SECRET
+          value: "mysecret"
+        - name: ITERATION
+          value: "33"
+        - name: KEY_LENGTH
+          value: "256"
+        image: {{DOCKER_IMAGE_TAG}}
+        name: ms-parameter
+        resources:
+          requests:
+            cpu: 120m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+      hostname: ms-parameter
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-parameter
+  namespace: kube-honduras
+  labels:
+    app: ms-parameter-honduras
+spec:
+  selector:
+    app: ms-parameter-honduras
+  ports:
+    - protocol: TCP
+      port: 8083
+      targetPort: 8083
+      name: http
+  type: NodePort
+

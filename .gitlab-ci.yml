@@ -1,0 +1,29 @@
+image: docker:latest
+services:
+  - docker:dind
+before_script:
+  - export BUILD_VERSION=1.0.9
+  - echo $BUILD_VERSION
+  - export DOCKER_IMAGE_TAG="us.gcr.io/hondu-pf/ms-parameter:$BUILD_VERSION"
+  - echo $DOCKER_IMAGE_TAG
+variables:
+  DOCKER_DRIVER: overlay
+  SPRING_PROFILES_ACTIVE: gitlab-ci
+  GIT_STRATEGY: fetch
+
+stages:
+  - deploy
+   
+k8s-deploy:
+  image: google/cloud-sdk
+  stage: deploy
+  script:
+    - echo "$GOOGLE_KEY" > key.json
+    - gcloud auth activate-service-account --key-file key.json
+    - gcloud config set compute/zone us-east1-b
+    - gcloud config set project hondu-pf
+    - gcloud config set container/use_client_certificate True
+    - gcloud container clusters get-credentials cluster-hondu-pf
+    - cat deployment.yml | sed  's|{{DOCKER_IMAGE_TAG}}|'$DOCKER_IMAGE_TAG'|g' | kubectl apply -f -    
+#  only:
+#    - master
